@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>GTA MOBILE 3D</title>
+<script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+<style>
+*{user-select:none;-webkit-tap-highlight-color:transparent}
+body{margin:0;overflow:hidden;background:#000;font-family:'Arial Black'}
+#ui-top{position:absolute;top:15px;width:100%;text-align:center;color:yellow;font-size:20px;text-shadow:2px 2px 3px black;z-index:10}
+#warna{position:absolute;top:15px;left:15px;display:flex;gap:8px;z-index:10}
+.warna-btn{width:30px;height:30px;border:2px solid white;border-radius:50%;cursor:pointer}
+#setir{position:absolute;bottom:25px;right:25px;width:130px;height:130px;border:6px solid white;border-radius:50%;background:rgba(0,0,0,0.5);z-index:10;touch-action:none}
+#tengah{position:absolute;width:25px;height:25px;background:red;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%)}
+.btn{position:absolute;bottom:25px;width:75px;height:75px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:bold;border:3px solid white;z-index:10}
+#gas{left:15px;background:rgba(0,255,0,0.85)}
+#rem{left:95px;background:rgba(255,0,0,0.85)}
+#mundur{left:175px;background:rgba(0,0,255,0.85)}
+#klakson{right:165px;width:65px;height:65px;background:rgba(255,255,0,0.85);color:black;font-size:11px}
+.btn:active{transform:scale(0.9)}
+</style>
+</head>
+<body>
+<div id="ui-top">Skor: 0 | Bintang: 0</div>
+<div id="warna">
+    <div class="warna-btn" style="background:red" data-warna="0xff0000"></div>
+    <div class="warna-btn" style="background:blue" data-warna="0x0000ff"></div>
+    <div class="warna-btn" style="background:green" data-warna="0x00ff00"></div>
+    <div class="warna-btn" style="background:yellow" data-warna="0xffff00"></div>
+    <div class="warna-btn" style="background:purple" data-warna="0x800080"></div>
+</div>
+
+<div id="gas" class="btn">GAS</div>
+<div id="rem" class="btn">REM</div>
+<div id="mundur" class="btn">MUNDUR</div>
+<div id="klakson" class="btn">KLAKSON</div>
+<div id="setir"><div id="tengah"></div></div>
+
+<script type="module">
+import * as THREE from 'three';
+
+// SCENE
+let scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB);
+scene.fog = new THREE.Fog(0x87CEEB, 30, 120);
+let camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 300);
+let renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// LAMPU
+scene.add(new THREE.DirectionalLight(0xffffff, 1.3).position.set(10,20,10));
+scene.add(new THREE.AmbientLight(0x707070));
+
+// KOTA
+let jalan = new THREE.Mesh(new THREE.PlaneGeometry(24, 2000), new THREE.MeshLambertMaterial({color:0x2a2a2a}));
+jalan.rotation.x = -Math.PI/2; scene.add(jalan);
+for(let i=-1000;i<1000;i+=25){
+    for(let x of [-14,14]){
+        let gedung = new THREE.Mesh(new THREE.BoxGeometry(5,Math.random()*15+5,5), new THREE.MeshLambertMaterial({color:0x444}));
+        gedung.position.set(x, gedung.geometry.parameters.height/2, i);
+        scene.add(gedung);
+    }
+}
+
+// MOBIL PLAYER
+let bodyMat = new THREE.MeshLambertMaterial({color:0xff0000});
+let mobil = new THREE.Group();
+let body = new THREE.Mesh(new THREE.BoxGeometry(1,0.5,2), bodyMat); body.position.y=0.25; mobil.add(body);
+for(let i=0;i<4;i++){ let r=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.1,16), new THREE.MeshBasicMaterial({color:0x111})); r.rotation.z=Math.PI/2; r.position.set(i%2?-0.5:0.5,0.2,i<2?-0.7:0.7); mobil.add(r); }
+mobil.position.set(0,0.25,0); scene.add(mobil);
+
+// VARIABEL
+let sudut=0, gas=0, rem=0, mundur=0, kecepatan=0, skor=0, bintang=0;
+let mobilLain=[], polisi=[], orang=[], audioCtx;
+
+// GANTI WARNA
+document.querySelectorAll('.warna-btn').forEach(btn=>{
+    btn.onclick=()=>{ bodyMat.color.setHex(btn.dataset.warna); }
+});
+
+// SUARA
+function bunyi(t){ if(!audioCtx) audioCtx=new AudioContext(); let o=audioCtx.createOscillator(),g=audioCtx.createGain(); o.connect(g).connect(audioCtx.destination);
+    if(t=='k'){o.frequency.value=550;g.gain.setValueAtTime(0.3,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.2)}
+    if(t=='m'){o.frequency.value=220;g.gain.setValueAtTime(0.2,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.1)}
+    o.start();o.stop(audioCtx.currentTime+0.3);
+}
+
+// KONTROL HP
+let setir=document.getElementById('setir');
+setir.ontouchmove=e=>{let r=setir.getBoundingClientRect();sudut=Math.atan2(e.touches[0].clientX-(r.left+65),-(e.touches[0].clientY-(r.top+65)));document.getElementById('tengah').style.transform=`rotate(${sudut}rad) translate(-50%,-50%)`;}
+setir.ontouchend=()=>sudut=0;
+['gas','rem','mundur','klakson'].forEach(id=>{
+    document.getElementById(id).ontouchstart=()=>window[id]=1;
+    document.getElementById(id).ontouchend=()=>{window[id]=0; if(id=='klakson') bunyi('k'); if(id=='mundur') bunyi('m');}
+});
+
+// SPAWN
+setInterval(()=>{let m=new THREE.Mesh(new THREE.BoxGeometry(1,0.5,2),new THREE.MeshLambertMaterial({color:0x00aaff}));m.position.set((Math.random()-0.5)*10,0.25,-120);scene.add(m);mobilLain.push(m);},1000);
+setInterval(()=>{let p=new THREE.Group();p.add(new THREE.Mesh(new THREE.BoxGeometry(1,0.5,2),new THREE.MeshLambertMaterial({color:0x0000ff})));p.add(new THREE.Mesh(new THREE.BoxGeometry(1,0.1,0.2),new THREE.MeshBasicMaterial({color:0xff0000})).position.set(0,0.3,0));p.position.set((Math.random()-0.5)*10,0.25,-140);scene.add(p);polisi.push(p);},7000);
+setInterval(()=>{let o=new THREE.Group();o.add(new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,0.8),new THREE.MeshLambertMaterial({color:0xffdbac})));o.position.set((Math.random()-0.5)*10,0.4,-90);scene.add(o);orang.push(o);},2500);
+
+// GAME LOOP
+function loop(){
+    requestAnimationFrame(loop);
+
+    // FISIKA
+    if(gas)kecepatan+=0.02; if(rem)kecepatan-=0.04; if(mundur)kecepatan-=0.02;
+    if(!gas&&!rem&&!mundur)kecepatan*=0.98;
+    kecepatan=Math.max(-0.3,Math.min(0.6,kecepatan));
+
+    mobil.rotation.y+=sudut*0.04*Math.abs(kecepatan);
+    mobil.position.x+=Math.sin(mobil.rotation.y)*kecepatan*6;
+    mobil.position.z-=Math.cos(mobil.rotation.y)*kecepatan*6;
+    mobil.position.x=Math.max(-10,Math.min(10,mobil.position.x));
+
+    // UPDATE OBJEK
+    [...mobilLain,...polisi,...orang].forEach(obj=>{
+        obj.position.z+=kecepatan*6+0.3;
+        if(obj.position.z>15)scene.remove(obj);
+
+        // TABRAKAN
+        if(Math.abs(mobil.position.x-obj.position.x)<0.9 && Math.abs(mobil.position.z-obj.position.z)<1.8){
+            if(polisi.includes(obj)){kecepatan=0; bintang=Math.min(5,bintang+1);}
+            if(orang.includes(obj)){bintang=Math.min(5,bintang+2);}
+        }
+    });
+
+    // POLISI KEJAR
+    if(bintang>0)polisi.forEach(p=>p.position.x+=Math.sign(mobil.position.x-p.position.x)*0.04);
+
+    // KAMERA
+    camera.position.set(mobil.position.x,5,mobil.position.z+9);
+    camera.lookAt(mobil.position.x,0,mobil.position.z-12);
+
+    skor=Math.floor(-mobil.position.z);
+    document.getElementById('ui-top').innerHTML=`Skor: ${skor} | Bintang: ${'⭐'.repeat(bintang)}`;
+
+    renderer.render(scene,camera);
+}
+loop();
+
+window.onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);}
+</script>
+</body>
+</html>
