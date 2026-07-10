@@ -14,7 +14,7 @@ body{margin:0;overflow:hidden;background:#000;font-family:'Arial Black'}
 #warna{position:absolute;top:15px;left:15px;display:flex;gap:8px;z-index:10}
 .warna-btn{width:30px;height:30px;border:2px solid white;border-radius:50%;cursor:pointer}
 #setir{position:absolute;bottom:25px;right:25px;width:130px;height:130px;border:6px solid white;border-radius:50%;background:rgba(0,0,0,0.5);z-index:10;touch-action:none}
-#tengah{position:absolute;width:25px;height:25px;background:red;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%)}
+#tengah{position:absolute;width:25px;height:25px;background:red;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
 .btn{position:absolute;bottom:25px;width:75px;height:75px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:bold;border:3px solid white;z-index:10}
 #gas{left:15px;background:rgba(0,255,0,0.85)}
 #rem{left:95px;background:rgba(255,0,0,0.85)}
@@ -60,8 +60,9 @@ let jalan = new THREE.Mesh(new THREE.PlaneGeometry(24, 2000), new THREE.MeshLamb
 jalan.rotation.x = -Math.PI/2; scene.add(jalan);
 for(let i=-1000;i<1000;i+=25){
     for(let x of [-14,14]){
-        let gedung = new THREE.Mesh(new THREE.BoxGeometry(5,Math.random()*15+5,5), new THREE.MeshLambertMaterial({color:0x444}));
-        gedung.position.set(x, gedung.geometry.parameters.height/2, i);
+        let h=Math.random()*15+5;
+        let gedung = new THREE.Mesh(new THREE.BoxGeometry(5,h,5), new THREE.MeshLambertMaterial({color:0x444}));
+        gedung.position.set(x, h/2, i);
         scene.add(gedung);
     }
 }
@@ -89,14 +90,31 @@ function bunyi(t){ if(!audioCtx) audioCtx=new AudioContext(); let o=audioCtx.cre
     o.start();o.stop(audioCtx.currentTime+0.3);
 }
 
-// KONTROL HP
-let setir=document.getElementById('setir');
-setir.ontouchmove=e=>{let r=setir.getBoundingClientRect();sudut=Math.atan2(e.touches[0].clientX-(r.left+65),-(e.touches[0].clientY-(r.top+65)));document.getElementById('tengah').style.transform=`rotate(${sudut}rad) translate(-50%,-50%)`;}
-setir.ontouchend=()=>sudut=0;
+// FUNGSI KONTROL BARU - BISA HP + LAPTOP
+function setKontrol(id, val){
+    window[id]=val;
+    if(id=='klakson' && val==1) bunyi('k');
+    if(id=='mundur' && val==1) bunyi('m');
+}
+
 ['gas','rem','mundur','klakson'].forEach(id=>{
-    document.getElementById(id).ontouchstart=()=>window[id]=1;
-    document.getElementById(id).ontouchend=()=>{window[id]=0; if(id=='klakson') bunyi('k'); if(id=='mundur') bunyi('m');}
+    let el=document.getElementById(id);
+    el.onmousedown=el.ontouchstart=()=>setKontrol(id,1);
+    el.onmouseup=el.ontouchend=el.onmouseleave=()=>setKontrol(id,0);
 });
+
+// SETIR BISA MOUSE + TOUCH
+let setir=document.getElementById('setir');
+function handleSetir(x,y){
+    let r=setir.getBoundingClientRect();
+    sudut=Math.atan2(x-(r.left+65),-(y-(r.top+65)));
+    document.getElementById('tengah').style.transform=`rotate(${sudut}rad) translate(-50%,-50%)`;
+}
+setir.onmousedown=e=>{handleSetir(e.clientX,e.clientY); window.mousedown=true;}
+setir.onmousemove=e=>{if(window.mousedown)handleSetir(e.clientX,e.clientY)}
+window.onmouseup=()=>{window.mousedown=false;sudut=0;}
+setir.ontouchmove=e=>{handleSetir(e.touches[0].clientX,e.touches[0].clientY)}
+setir.ontouchend=()=>sudut=0;
 
 // SPAWN
 setInterval(()=>{let m=new THREE.Mesh(new THREE.BoxGeometry(1,0.5,2),new THREE.MeshLambertMaterial({color:0x00aaff}));m.position.set((Math.random()-0.5)*10,0.25,-120);scene.add(m);mobilLain.push(m);},1000);
@@ -118,11 +136,12 @@ function loop(){
     mobil.position.x=Math.max(-10,Math.min(10,mobil.position.x));
 
     // UPDATE OBJEK
-    [...mobilLain,...polisi,...orang].forEach(obj=>{
-        obj.position.z+=kecepatan*6+0.3;
-        if(obj.position.z>15)scene.remove(obj);
+    for(let i=mobilLain.length-1;i>=0;i--){mobilLain[i].position.z+=kecepatan*6+0.3; if(mobilLain[i].position.z>15){scene.remove(mobilLain[i]); mobilLain.splice(i,1);}}
+    for(let i=polisi.length-1;i>=0;i--){polisi[i].position.z+=kecepatan*6+0.3; if(polisi[i].position.z>15){scene.remove(polisi[i]); polisi.splice(i,1);}}
+    for(let i=orang.length-1;i>=0;i--){orang[i].position.z+=kecepatan*6+0.3; if(orang[i].position.z>15){scene.remove(orang[i]); orang.splice(i,1);}}
 
-        // TABRAKAN
+    // TABRAKAN
+    [...mobilLain,...polisi,...orang].forEach(obj=>{
         if(Math.abs(mobil.position.x-obj.position.x)<0.9 && Math.abs(mobil.position.z-obj.position.z)<1.8){
             if(polisi.includes(obj)){kecepatan=0; bintang=Math.min(5,bintang+1);}
             if(orang.includes(obj)){bintang=Math.min(5,bintang+2);}
@@ -147,5 +166,3 @@ window.onresize=()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectio
 </script>
 </body>
 </html>
-
-<!--v7-->
