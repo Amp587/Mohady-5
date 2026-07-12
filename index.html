@@ -3,22 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Game Mobil Balap Ledakan V2</title>
+<title>Game Mobil Balap + Jalan V15.1</title>
 <style>
 body{margin:0;overflow:hidden;background:#87CEEB;touch-action:none;transition:background 0.1s}
 #info{position:absolute;top:10px;width:100%;text-align:center;color:white;background:rgba(0,0,0,0.7);padding:8px;font-size:14px;font-family:Arial;z-index:10}
+#speed{position:absolute;top:50px;width:100%;text-align:center;color:#00ff00;background:rgba(0,0,0,0.7);padding:5px;font-size:20px;font-weight:bold;font-family:Arial;z-index:10}
 #dpad{position:absolute;bottom:30px;left:20px;display:grid;grid-template-columns: 80px 80px 80px;grid-template-rows: 80px 80px;gap:12px;z-index:10;}
-.btn{width:80px;height:80px;font-size:36px;font-weight:bold;background:rgba(255,255,255,0.9);border:4px solid #333;border-radius:15px;box-shadow:0 5px 10px rgba(0,0,0,0.5);cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;}
+.btn{width:110px;height:110px;font-size:48px;font-weight:bold;background:rgba(255,255,255,0.9);border:4px solid #333;border-radius:15px;box-shadow:0 5px 10px rgba(0,0,0,0.5);cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;}
 .btn:active{background:#ccc; transform:scale(0.9)}
 #up{grid-column:2; grid-row:1;} #left{grid-column:1; grid-row:2;} #down{grid-column:2; grid-row:2;} #right{grid-column:3; grid-row:2;}
-#klakson{position:absolute;bottom:30px;right:20px;width:120px;height:120px;background:red;font-size:18px;font-weight:bold;color:white;border-radius:50%;border:4px solid #333;box-shadow:0 5px 10px rgba(0,0,0,0.5);z-index:10;}
+#klakson{position:absolute;bottom:30px;right:20px;width:150px;height:150px;background:red;font-size:24px;font-weight:bold;color:white;border-radius:50%;border:4px solid #333;box-shadow:0 5px 10px rgba(0,0,0,0.5);z-index:10;}
 #klakson:active{background:#cc0000; transform:scale(0.9)}
+#btnBalap{position:absolute;top:90px;right:20px;padding:12px 20px;font-size:16px;font-weight:bold;background:yellow;border:4px solid #000;border-radius:10px;z-index:10;cursor:pointer;}
+#btnJalan{position:absolute;top:90px;right:20px;padding:12px 20px;font-size:16px;font-weight:bold;background:#4CAF50;border:4px solid #000;border-radius:10px;z-index:10;cursor:pointer;display:none;}
 </style>
 </head>
 <body>
-<div id="info">KETUK/KLIK LAYAR 1X DULU | TABRAK = BOOM</div>
+<div id="info">KETUK/KLIK LAYAR 1X DULU | MODE JALAN-JALAN</div>
+<div id="speed">KEC: 0 KM/J</div>
+<button id="btnBalap">MULAI BALAP</button>
+<button id="btnJalan">MODE JALAN</button>
 <div id="dpad"><button class="btn" id="up">↑</button><button class="btn" id="left">←</button><button class="btn" id="down">↓</button><button class="btn" id="right">→</button></div>
-<button class="btn" id="klakson">NITRO<br>BOOM</button>
+<button class="btn" id="klakson">NITRO<br>KLAKSON</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
 <script>
@@ -31,30 +37,37 @@ let dirLight = new THREE.DirectionalLight(0xffffff, 1);
 dirLight.position.set(0, 10, 5); scene.add(dirLight);
 
 let isiPerumahan = new THREE.Group(); scene.add(isiPerumahan);
+let isiArenaBalap = new THREE.Group(); scene.add(isiArenaBalap); isiArenaBalap.visible = false;
 let semuaOrang = [];
 let mobilLawanArah = [];
 let mobilNyalip = [];
-let apiArray = [];
+let mobilMusuhBalap = [];
+let asapArray = [];
 let ledakanArray = [];
 let semuaPohon = [];
 let semuaRumah = [];
 let tabrakanCooldown = 0;
+let LEVEL_KECEPATAN = 1.0;
+let modeBalap = false;
+let garisFinish = -500;
+let mulaiWaktu = 0;
 
 const DAFTAR_WARNA = [0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00, 0xFF00FF, 0x00FFFF, 0xFF8000, 0x8000FF, 0xFF0080, 0x80FF00];
 let indexWarna = 0;
 
+// ========== DUNIA JALAN-JALAN ==========
 let jalan = new THREE.Mesh(new THREE.PlaneGeometry(20, 10000), new THREE.MeshPhongMaterial({color:0x4a4a4a}));
-jalan.rotation.x = -Math.PI/2; jalan.position.y = 0; scene.add(jalan);
+jalan.rotation.x = -Math.PI/2; jalan.position.y = 0; isiPerumahan.add(jalan);
 
 let pembatasMat = new THREE.MeshPhongMaterial({color:0xffffff});
-let pk = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 10000), pembatasMat); pk.position.set(-10, 0.1, 0); scene.add(pk);
-let pkn = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 10000), pembatasMat); pkn.position.set(10, 0.1, 0); scene.add(pkn);
+let pk = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 10000), pembatasMat); pk.position.set(-10, 0.1, 0); isiPerumahan.add(pk);
+let pkn = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 10000), pembatasMat); pkn.position.set(10, 0.1, 0); isiPerumahan.add(pkn);
 
 let semuaGaris = [];
 for(let i=-5000; i<5000; i+=20){
   let garis = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 8), new THREE.MeshPhongMaterial({color:0xffffff}));
   garis.rotation.x = -Math.PI/2; garis.position.set(0, 0.1, i);
-  scene.add(garis);
+  isiPerumahan.add(garis);
   semuaGaris.push(garis);
 }
 
@@ -70,7 +83,7 @@ function buatOrang(x, z){
   isiPerumahan.add(orang); semuaOrang.push(orang);
 }
 
-function buatMobilSedan(z, x, arah, kecepatan, arrayTarget){
+function buatMobilSedan(z, x, arah, kecepatan, arrayTarget, targetGroup=isiPerumahan){
   let mobil = new THREE.Group();
   let warna = DAFTAR_WARNA[indexWarna % DAFTAR_WARNA.length]; indexWarna++;
   let bodyMat = new THREE.MeshPhongMaterial({color:warna, shininess: 100});
@@ -91,7 +104,7 @@ function buatMobilSedan(z, x, arah, kecepatan, arrayTarget){
   let rodaMat = new THREE.MeshPhongMaterial({color:0x222});
   [[-0.9,-1.2], [0.9,-1.2], [-0.9,1.2], [0.9,1.2]].forEach(p=>{ let roda = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.25, 16), rodaMat); roda.rotation.z = Math.PI/2; roda.position.set(p[0], 0.35, p[1]); mobil.add(roda); });
   mobil.position.set(x, 0, z); mobil.rotation.y = arah; mobil.userData = {kecepatan: kecepatan};
-  isiPerumahan.add(mobil); arrayTarget.push(mobil);
+  targetGroup.add(mobil); arrayTarget.push(mobil);
 }
 
 function buatPohon(x, z){
@@ -111,11 +124,38 @@ for(let i=-500; i<500; i+=40){
   buatPohon(-13, i); buatRumah(-17, i+20, 0xF5DEB3, 0xA0522D); buatRumah(-17, i-20, 0xFFFFFF, 0x8B0000);
   buatPohon(13, i+10); buatRumah(17, i, 0xADD8E6, 0x696969); buatRumah(17, i+40, 0xFFE4E1, 0xCD853F);
   if(i % 20 === 0){ buatOrang(-9.2, i); buatOrang(9.2, i+10); }
-  if(i % 50 === 0){ buatMobilSedan(i, 3, Math.PI, 0.4 + Math.random() * 0.2, mobilLawanArah); }
-  if(i % 70 === 0){ buatMobilSedan(i, -3, 0, 0.6 + Math.random() * 0.3, mobilNyalip); }
+  if(i % 50 === 0){ buatMobilSedan(i, 3, Math.PI, (0.4 + Math.random() * 0.2) * LEVEL_KECEPATAN, mobilLawanArah); }
+  if(i % 70 === 0){ buatMobilSedan(i, -3, 0, (0.6 + Math.random() * 0.3) * LEVEL_KECEPATAN, mobilNyalip); }
 }
 
-// ========== MOBIL BALAP F1 ==========
+// ========== ARENA BALAP ==========
+let jalanBalap = new THREE.Mesh(new THREE.PlaneGeometry(20, 600), new THREE.MeshPhongMaterial({color:0x333}));
+jalanBalap.rotation.x = -Math.PI/2; jalanBalap.position.y = 0; jalanBalap.position.z = -250; isiArenaBalap.add(jalanBalap);
+
+let pembatasBalapK = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 600), new THREE.MeshPhongMaterial({color:0xffffff}));
+pembatasBalapK.position.set(-10, 0.15, -250); isiArenaBalap.add(pembatasBalapK);
+let pembatasBalapKn = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 600), new THREE.MeshPhongMaterial({color:0xffffff}));
+pembatasBalapKn.position.set(10, 0.15, -250); isiArenaBalap.add(pembatasBalapKn);
+
+// GARIS START PUTIH
+let garisStart = new THREE.Mesh(new THREE.PlaneGeometry(20, 3), new THREE.MeshPhongMaterial({color:0xffffff}));
+garisStart.rotation.x = -Math.PI/2; garisStart.position.set(0, 0.2, 0); isiArenaBalap.add(garisStart);
+
+// GARIS PUTUS2 HITAM
+for(let i=-8; i<=8; i+=2){
+  let garisPutih = new THREE.Mesh(new THREE.PlaneGeometry(1, 3), new THREE.MeshPhongMaterial({color:0x000}));
+  garisPutih.rotation.x = -Math.PI/2; garisPutih.position.set(i, 0.21, 0); isiArenaBalap.add(garisPutih);
+}
+
+// GARIS FINISH
+for(let i=-10; i<=10; i+=2){
+  let kotak = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshPhongMaterial({color: i%4==0?0x000:0xffffff}));
+  kotak.rotation.x = -Math.PI/2; kotak.position.set(i, 0.2, garisFinish); isiArenaBalap.add(kotak);
+}
+
+
+
+// ========== MOBIL PLAYER F1 ==========
 let mobil = new THREE.Group();
 let bodyMatPlayer = new THREE.MeshPhongMaterial({color:0xff0000, shininess: 200});
 let sayapMat = new THREE.MeshPhongMaterial({color:0x222, shininess: 50});
@@ -141,91 +181,90 @@ let rodaMatPlayer = new THREE.MeshPhongMaterial({color:0x111});
   let roda = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.45, 20), rodaMatPlayer);
   roda.rotation.z = Math.PI/2; roda.position.set(p[0], 0.5, p[1]); mobil.add(roda);
 });
-scene.add(mobil); camera.position.set(0, 6, 14);
+isiPerumahan.add(mobil); camera.position.set(0, 6, 14);
 
-function buatApi(x, y, z){
-  let apiMat = new THREE.MeshBasicMaterial({color:0xff6600, transparent:true, opacity:0.8});
-  let api = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.5, 8), apiMat);
-  api.rotation.x = Math.PI;
-  api.position.set(x, y, z);
-  api.userData = {umur: 0};
-  isiPerumahan.add(api);
-  apiArray.push(api);
+// FUNGSI GANTI MODE V15.1
+function mulaiBalap(){
+  modeBalap = true;
+  mulaiWaktu = Date.now();
+  isiPerumahan.visible = false;
+  isiArenaBalap.visible = true;
+  isiArenaBalap.add(mobil);
+  mobil.position.set(0,0,0);
+  mobil.rotation.y = 0;
+  document.getElementById('btnBalap').style.display = 'none';
+  document.getElementById('btnJalan').style.display = 'block';
+  document.getElementById('info').innerText = "SIAP... 3...2...1...";
+
+  mobilMusuhBalap.forEach(m => isiArenaBalap.remove(m));
+  mobilMusuhBalap = [];
+
+// SEMUA SEJAJAR DI START, PLAYER DI TENGAH
+buatMobilSedan(0, -8, 0, 0.74 * LEVEL_KECEPATAN, mobilMusuhBalap, isiArenaBalap); // MUSUH 1 PALING KIRI
+buatMobilSedan(0, -4, 0, 0.75 * LEVEL_KECEPATAN, mobilMusuhBalap, isiArenaBalap); // MUSUH 2 KIRI
+buatMobilSedan(0, 4, 0, 0.73 * LEVEL_KECEPATAN, mobilMusuhBalap, isiArenaBalap); // MUSUH 3 KANAN
+buatMobilSedan(0, 8, 0, 0.74 * LEVEL_KECEPATAN, mobilMusuhBalap, isiArenaBalap); // MUSUH 4 KIRI  
+ 
+
+  setTimeout(()=>{
+    document.getElementById('info').innerText = "GO!";
+  }, 5000); // 5 DETIK
 }
 
+
+function kembaliJalan(){
+  modeBalap = false;
+  isiPerumahan.visible = true;
+  isiArenaBalap.visible = false;
+  isiPerumahan.add(mobil);
+  mobil.position.set(0,0,0);
+  document.getElementById('btnBalap').style.display = 'block';
+  document.getElementById('btnJalan').style.display = 'none';
+  document.getElementById('info').innerText = "MODE JALAN-JALAN";
+  mobilMusuhBalap.forEach(m => isiArenaBalap.remove(m));
+  mobilMusuhBalap = [];
+}
+document.getElementById('btnBalap').addEventListener('click', mulaiBalap);
+document.getElementById('btnJalan').addEventListener('click', kembaliJalan);
+
+// ASAP + LEDAKAN
+function buatAsapPotong(posX, posY, posZ, arahRotasi){
+  for(let i=0; i<4; i++){
+    let asapMat = new THREE.MeshBasicMaterial({color:0x444, transparent:true, opacity:0.7 - i*0.15, depthWrite: false});
+    let ukuran = 0.3 - i*0.05;
+    let asap = new THREE.Mesh(new THREE.SphereGeometry(ukuran, 8, 8), asapMat);
+    let jarakBelakang = 2.4 + i*0.8;
+    asap.position.x = posX + Math.sin(arahRotasi) * jarakBelakang;
+    asap.position.y = posY;
+    asap.position.z = posZ + Math.cos(arahRotasi) * jarakBelakang;
+    asap.userData = {umur: i*5, kecepatan: 0.6 + i*0.1, arahRotasi: arahRotasi};
+    (modeBalap? isiArenaBalap: isiPerumahan).add(asap);
+    asapArray.push(asap);
+  }
+}
 function buatLedakan(x, y, z){
   for(let i=0; i<25; i++){
     let warna = [0xff0000, 0xff6600, 0xffff00][Math.floor(Math.random()*3)];
     let partikelMat = new THREE.MeshBasicMaterial({color:warna, transparent:true, opacity:0.9});
     let partikel = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), partikelMat);
     partikel.position.set(x, y, z);
-    partikel.userData = {
-      vx: (Math.random()-0.5)*1.8,
-      vy: Math.random()*1.8,
-      vz: (Math.random()-0.5)*1.8,
-      umur: 0
-    };
-    isiPerumahan.add(partikel);
+    partikel.userData = {vx: (Math.random()-0.5)*1.8, vy: Math.random()*1.8, vz: (Math.random()-0.5)*1.8, umur: 0};
+    (modeBalap? isiArenaBalap: isiPerumahan).add(partikel);
     ledakanArray.push(partikel);
   }
 }
 
-// ========== KODE AUDIO V2 LEBIH NYARING ==========
 let audioCtx;
 function bunyi(tipe, cepat=1){
   if(!audioCtx) audioCtx = new AudioContext();
-
-  if(tipe=='mesin'){
-    let o = audioCtx.createOscillator();
-    let g = audioCtx.createGain();
-    o.connect(g).connect(audioCtx.destination);
-    o.frequency.value = 120 + cepat * 500;
-    g.gain.value = 0.06 + cepat * 0.25;
-    o.start(); o.stop(audioCtx.currentTime + 0.1);
-  }
-
-  if(tipe=='klakson'){
-    let o = audioCtx.createOscillator();
-    let g = audioCtx.createGain();
-    o.connect(g).connect(audioCtx.destination);
-    o.frequency.value = 550;
-    g.gain.value = 0.5;
-    o.start(); o.stop(audioCtx.currentTime + 0.4);
-  }
-
-  if(tipe=='tabrak'){ // BUNYI TABRAKAN NYARING V2
-    // 1. BASS DUK KENCENG
-    let bass = audioCtx.createOscillator();
-    let gBass = audioCtx.createGain();
-    bass.type = 'sine';
-    bass.frequency.value = 50;
-    gBass.gain.value = 1.2; // VOLUME GEDE
-    bass.connect(gBass).connect(audioCtx.destination);
-    bass.start(); bass.stop(audioCtx.currentTime + 0.6);
-
-    // 2. BENTURAN BESI
-    let bentur = audioCtx.createOscillator();
-    let gBentur = audioCtx.createGain();
-    bentur.type = 'square';
-    bentur.frequency.value = 300;
-    gBentur.gain.value = 0.8;
-    bentur.connect(gBentur).connect(audioCtx.destination);
-    bentur.start(); bentur.stop(audioCtx.currentTime + 0.3);
-
-    // 3. PECAHAN KACA
-    let kaca = audioCtx.createOscillator();
-    let gKaca = audioCtx.createGain();
-    kaca.type = 'sawtooth';
-    kaca.frequency.value = 1200;
-    gKaca.gain.value = 0.6;
-    kaca.connect(gKaca).connect(audioCtx.destination);
-    kaca.start(); kaca.stop(audioCtx.currentTime + 0.2);
-  }
+  if(tipe=='mesin'){let o=audioCtx.createOscillator();let g=audioCtx.createGain();o.connect(g).connect(audioCtx.destination);o.frequency.value=120+cepat*500;g.gain.value=0.06+cepat*0.25;o.start();o.stop(audioCtx.currentTime+0.1);}
+  if(tipe=='klakson'){let o=audioCtx.createOscillator();let g=audioCtx.createGain();o.connect(g).connect(audioCtx.destination);o.frequency.value=550;g.gain.value=0.5;o.start();o.stop(audioCtx.currentTime+0.4);}
+  if(tipe=='tabrak'){let bass=audioCtx.createOscillator();let gBass=audioCtx.createGain();bass.type='sine';bass.frequency.value=50;gBass.gain.value=1.2;bass.connect(gBass).connect(audioCtx.destination);bass.start();bass.stop(audioCtx.currentTime+0.6);}
 }
 
 let keys = {up:false, down:false, left:false, right:false};
 function addControls(id, key){ let btn = document.getElementById(id); btn.addEventListener('mousedown', ()=>keys[key]=true); btn.addEventListener('mouseup', ()=>keys[key]=false);
-btn.addEventListener('touchstart', (e)=>{e.preventDefault(); keys[key]=true; document.getElementById('info').innerText=""}); btn.addEventListener('touchend', (e)=>{e.preventDefault(); keys[key]=false}); }
+btn.addEventListener('touchstart', (e)=>{e.preventDefault(); keys[key]=true}); btn.addEventListener('touchend', (e)=>{e.preventDefault(); keys[key]=false}); }
 addControls('up','up'); addControls('down','down'); addControls('left','left'); addControls('right','right');
 document.getElementById('klakson').addEventListener('mousedown', ()=>bunyi('klakson')); document.getElementById('klakson').addEventListener('touchstart', (e)=>{e.preventDefault(); bunyi('klakson')});
 document.body.addEventListener('click', ()=>{if(!audioCtx) audioCtx = new AudioContext()});
@@ -238,14 +277,18 @@ function jalanin(){
   let posisiXBaru = mobil.position.x;
   let posisiZBaru = mobil.position.z;
 
-  if(keys.up){ posisiZBaru -= 0.6; cepat=2; lagiNgebut = true; }
-  if(keys.down){ posisiZBaru += 0.4; cepat=1; }
-  if(keys.left) posisiXBaru -= 0.4;
-  if(keys.right) posisiXBaru += 0.4;
+  let bisaJalan = modeBalap? (Date.now() > mulaiWaktu + 5000) : true;
 
+  if(keys.up && bisaJalan){ posisiZBaru -= 0.75 * LEVEL_KECEPATAN; cepat=2; lagiNgebut = true; }
+  if(keys.down){ posisiZBaru += 0.4 * LEVEL_KECEPATAN; cepat=1; }
+  if(keys.left) posisiXBaru -= 0.4 * LEVEL_KECEPATAN;
+  if(keys.right) posisiXBaru += 0.4 * LEVEL_KECEPATAN;
+
+  document.getElementById('speed').innerText = "KEC: " + Math.floor(cepat*100) + " KM/J";
+
+  let targetTabrak = modeBalap? mobilMusuhBalap : [...mobilLawanArah,...mobilNyalip];
   let tabrakan = false;
-  let semuaMobil = [...mobilLawanArah,...mobilNyalip];
-  for(let m of semuaMobil){
+  for(let m of targetTabrak){
     let jarakX = Math.abs(posisiXBaru - m.position.x);
     let jarakZ = Math.abs(posisiZBaru - m.position.z);
     if(jarakX < 1.8 && jarakZ < 3.5){
@@ -253,16 +296,21 @@ function jalanin(){
       if(tabrakanCooldown <= 0){
         bunyi('tabrak');
         buatLedakan(mobil.position.x, 0.5, mobil.position.z);
-        document.getElementById('info').innerText = "BOOOOM!";
-        document.body.style.background = 'white'; // FLASH PUTIH
+        document.getElementById('info').innerText = modeBalap? "KALAH BALAP!" : "DUH TABRAKAN!";
+        document.body.style.background = 'white';
         setTimeout(()=>{document.body.style.background = '#87CEEB'}, 100);
         tabrakanCooldown = 90;
-        camera.position.y = 6 + Math.random() * 0.8;
       }
     }
   }
+
+  if(modeBalap && mobil.position.z <= garisFinish){
+    document.getElementById('info').innerText = "MENANG! FINISH!";
+    setTimeout(()=>kembaliJalan(), 3000);
+  }
+
   if(tabrakanCooldown > 0) tabrakanCooldown--;
-  if(!tabrakan) document.getElementById('info').innerText = "KETUK/KLIK LAYAR 1X DULU | TEKAN ↑ UNTUK API";
+  if(!tabrakan && bisaJalan) document.getElementById('info').innerText = modeBalap? "MODE BALAP! KE FINISH: " + Math.abs(Math.floor(mobil.position.z - garisFinish)) + "m" : "MODE JALAN-JALAN";
 
   if(!tabrakan){
     mobil.position.x = posisiXBaru;
@@ -275,76 +323,57 @@ function jalanin(){
   if(mobil.position.x < -8) mobil.position.x = -8;
   if(mobil.position.x > 8) mobil.position.x = 8;
 
-  // ANIMASI LEDAKAN
   for(let i=ledakanArray.length-1; i>=0; i--){
     let p = ledakanArray[i];
-    p.position.x += p.userData.vx;
-    p.position.y += p.userData.vy;
-    p.position.z += p.userData.vz;
-    p.userData.vy -= 0.05;
-    p.scale.multiplyScalar(0.95);
-    p.material.opacity *= 0.95;
-    p.userData.umur++;
-    if(p.userData.umur > 40){
-      isiPerumahan.remove(p);
-      ledakanArray.splice(i, 1);
+    p.position.x += p.userData.vx; p.position.y += p.userData.vy; p.position.z += p.userData.vz;
+    p.userData.vy -= 0.05; p.scale.multiplyScalar(0.95); p.material.opacity *= 0.95; p.userData.umur++;
+    if(p.userData.umur > 40){(modeBalap? isiArenaBalap: isiPerumahan).remove(p); ledakanArray.splice(i, 1);}
+  }
+
+  if(lagiNgebut && Math.random() > 0.6){
+    let jarakSamping = 0.7;
+    let posKiriX = mobil.position.x + Math.sin(mobil.rotation.y) * 2.4 + Math.cos(mobil.rotation.y) * jarakSamping;
+    let posKiriZ = mobil.position.z + Math.cos(mobil.rotation.y) * 2.4 - Math.sin(mobil.rotation.y) * jarakSamping;
+    buatAsapPotong(posKiriX, 0.18, posKiriZ, mobil.rotation.y);
+    let posKananX = mobil.position.x + Math.sin(mobil.rotation.y) * 2.4 - Math.cos(mobil.rotation.y) * jarakSamping;
+    let posKananZ = mobil.position.z + Math.cos(mobil.rotation.y) * 2.4 + Math.sin(mobil.rotation.y) * jarakSamping;
+    buatAsapPotong(posKananX, 0.18, posKananZ, mobil.rotation.y);
+  }
+  for(let i=asapArray.length-1; i>=0; i--){
+    let asap = asapArray[i];
+    asap.position.x += Math.sin(asap.userData.arahRotasi) * asap.userData.kecepatan;
+    asap.position.z += Math.cos(asap.userData.arahRotasi) * asap.userData.kecepatan;
+    asap.scale.multiplyScalar(1.02); asap.material.opacity *= 0.96; asap.userData.umur++;
+    if(asap.userData.umur > 25){(modeBalap? isiArenaBalap: isiPerumahan).remove(asap); asapArray.splice(i, 1);}
+  }
+
+  if(!modeBalap){
+    semuaPohon.forEach(p => { if(p.position.z > mobil.position.z + 50){ p.position.z = mobil.position.z - 500 - Math.random() * 100; } });
+    semuaRumah.forEach(r => { if(r.position.z > mobil.position.z + 50){ r.position.z = mobil.position.z - 500 - Math.random() * 100; } });
+    semuaGaris.forEach(g => { if(g.position.z > mobil.position.z + 50){ g.position.z = mobil.position.z - 500; } });
+    semuaOrang.forEach(orang => {
+      orang.position.z += orang.userData.arah * orang.userData.kecepatan;
+      let waktu = Date.now() * 0.02;
+      orang.userData.kk.rotation.x = Math.sin(waktu) * 0.8;
+      orang.userData.kkn.rotation.x = -Math.sin(waktu) * 0.8;
+      orang.userData.tk.rotation.x = -Math.sin(waktu) * 0.6;
+      orang.userData.tkn.rotation.x = Math.sin(waktu) * 0.6;
+      if(orang.position.z > mobil.position.z + 40) orang.position.z = mobil.position.z - 150;
+    });
+    mobilLawanArah.forEach(m => { m.position.z += m.userData.kecepatan; if(m.position.z > mobil.position.z + 30) m.position.z = mobil.position.z - 200; });
+    mobilNyalip.forEach(m => { m.position.z -= m.userData.kecepatan; if(m.position.z < mobil.position.z - 100) m.position.z = mobil.position.z + 150; });
+  }
+
+  // KODE PENTING: MUSUH NUNGGU 5 DETIK BARU JALAN KE SELATAN
+  if(modeBalap){
+    let bisaJalanMusuh = Date.now() > mulaiWaktu + 5000;
+    if(bisaJalanMusuh){
+      mobilMusuhBalap.forEach(m => { m.position.z -= m.userData.kecepatan; });
     }
   }
 
-  // API
-  if(lagiNgebut && Math.random() > 0.3){
-    buatApi(-0.7, 0.18, mobil.position.z + 2.4);
-    buatApi(0.7, 0.18, mobil.position.z + 2.4);
-  }
-  for(let i=apiArray.length-1; i>=0; i--){
-    let api = apiArray[i];
-    api.position.z += 0.5;
-    api.scale.multiplyScalar(0.95);
-    api.userData.umur++;
-    if(api.userData.umur > 15){
-      isiPerumahan.remove(api);
-      apiArray.splice(i, 1);
-    }
-  }
-
-  // INFINITE
-  semuaPohon.forEach(p => {
-    if(p.position.z > mobil.position.z + 50){
-      p.position.z = mobil.position.z - 500 - Math.random() * 100;
-    }
-  });
-  semuaRumah.forEach(r => {
-    if(r.position.z > mobil.position.z + 50){
-      r.position.z = mobil.position.z - 500 - Math.random() * 100;
-    }
-  });
-  semuaGaris.forEach(g => {
-    if(g.position.z > mobil.position.z + 50){
-      g.position.z = mobil.position.z - 500;
-    }
-  });
-
-  semuaOrang.forEach(orang => {
-    orang.position.z += orang.userData.arah * orang.userData.kecepatan;
-    let waktu = Date.now() * 0.02;
-    orang.userData.kk.rotation.x = Math.sin(waktu) * 0.8;
-    orang.userData.kkn.rotation.x = -Math.sin(waktu) * 0.8;
-    orang.userData.tk.rotation.x = -Math.sin(waktu) * 0.6;
-    orang.userData.tkn.rotation.x = Math.sin(waktu) * 0.6;
-    if(orang.position.z > mobil.position.z + 40) orang.position.z = mobil.position.z - 150;
-  });
-
-  mobilLawanArah.forEach(m => {
-    m.position.z += m.userData.kecepatan;
-    if(m.position.z > mobil.position.z + 30) m.position.z = mobil.position.z - 200;
-  });
-
-  mobilNyalip.forEach(m => {
-    m.position.z -= m.userData.kecepatan;
-    if(m.position.z < mobil.position.z - 100) m.position.z = mobil.position.z + 150;
-  });
-
-  camera.position.z = mobil.position.z + 14;
+  camera.position.z = mobil.position.z
+camera.position.z = mobil.position.z + 14;
   camera.position.x = mobil.position.x;
   if(tabrakanCooldown <= 0) camera.position.y = 6;
   camera.lookAt(mobil.position.x, 0.3, mobil.position.z);
